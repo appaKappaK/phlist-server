@@ -13,7 +13,12 @@ Group=phlist
 # Create this file from .env.example and set PHLIST_API_KEY, PHLIST_HOST, etc.
 EnvironmentFile=/etc/phlist-server/.env
 
-ExecStart=/opt/phlist-server/venv/bin/python /opt/phlist-server/phlist_server.py
+ExecStart=/opt/phlist-server/venv/bin/gunicorn \
+    --bind ${PHLIST_HOST}:${PHLIST_PORT} \
+    --workers 2 \
+    --timeout 30 \
+    --access-logfile - \
+    phlist_server:app
 WorkingDirectory=/opt/phlist-server
 
 Restart=on-failure
