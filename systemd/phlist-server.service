@@ -1,0 +1,39 @@
+[Unit]
+Description=phlist blocklist server
+Documentation=https://github.com/appaKappaK/phlist-server
+After=network.target tailscaled.service
+Wants=tailscaled.service
+
+[Service]
+Type=simple
+User=phlist
+Group=phlist
+
+# Load config from /etc/phlist-server/.env
+# Create this file from .env.example and set PHLIST_API_KEY, PHLIST_HOST, etc.
+EnvironmentFile=/etc/phlist-server/.env
+
+ExecStart=/opt/phlist-server/venv/bin/python /opt/phlist-server/phlist_server.py
+WorkingDirectory=/opt/phlist-server
+
+Restart=on-failure
+RestartSec=5
+
+# ── Systemd hardening ────────────────────────────────────────────────────────
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+LockPersonality=yes
+
+# Only allow writing to the list storage directory.
+ReadWritePaths=/var/lib/phlist/lists
+
+[Install]
+WantedBy=multi-user.target

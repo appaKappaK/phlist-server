@@ -1,0 +1,23 @@
+# Handle line endings properly
+*.txt       text eol=lf
+*.py        text eol=lf
+*.md        text eol=lf
+*.toml      text eol=lf
+*.cfg       text eol=lf
+*.json      text eol=lf
+*.sh        text eol=lf
+*.service   text eol=lf
+*.env       text eol=lf
+*.example   text eol=lf
+
+# Binary files
+*.pyc       binary
+*.pyo       binary
+*.pyd       binary
+*.png       binary
+*.ico       binary
+__pycache__/* binary
+
+# Database files (binary, stored outside repo)
+*.db        binary
+*.sqlite    binary
