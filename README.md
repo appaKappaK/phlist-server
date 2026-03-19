@@ -1,6 +1,6 @@
 # phlist-server
 
-A lightweight Flask server that receives Pi-hole blocklists pushed from the [phlist](https://github.com/appaKappaK/PiHoleCombineList) desktop app and serves them as plain-text URLs that Pi-hole can subscribe to via gravity.
+A lightweight Flask server that receives Pi-hole blocklists pushed from the [phlist](https://github.com/appaKappaK/phlist) desktop app and serves them as plain-text URLs that Pi-hole can subscribe to via gravity.
 
 ## How it works
 
