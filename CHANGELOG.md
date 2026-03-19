@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.0] - 2026-03-19
+
+### Added
+- System stats sidebar on the dashboard — CPU % (animated arc gauge), CPU temperature with colour coding (green/yellow/red), RAM and disk progress bars, uptime, load average, hostname. Reads from `/proc` and `/sys` with no new dependencies
+- `GET /api/stats` — JSON endpoint returning cpu_pct, cpu_temp_c, mem_used_mb, mem_total_mb, mem_pct, disk_used_gb, disk_total_gb, disk_pct, uptime_s, load_avg, hostname
+- Fast preview mode — `GET /lists/{slug}.txt?preview=1` returns only the first 100 lines without loading the full file (dramatically faster for multi-MB lists)
+- `static/favicon.svg` — proper favicon, eliminating the browser 404 log noise
+- Dashboard auto-refreshes stats every 10s; list cards sync every 5s (both already existed, sidebar now uses stats endpoint)
+
+### Changed
+- Body layout split into two columns: fixed 240px sidebar + fluid main content area
+- Dashboard delete: if API key is already stored in `sessionStorage`, skips the modal and uses a native browser confirm — no re-entering the key on every delete. Modal only appears on first delete or after a 403 wrong-key error. Added "forget saved key" link in modal
+- Dashboard preview now fetches `?preview=1` instead of the full file — near-instant for large lists
+- `_MAX_BODY` increased from 50 MB to 2 GB (required for multi-million-domain combined lists)
+- gunicorn `--timeout` increased from 30s to 300s; added `--limit-request-line 0` (handles very large request lines)
+- `PHLIST_HOST` default in `.env.example` changed to `0.0.0.0` — required when Pi-hole is on the LAN but not on Tailscale. Tailscale-only setups can still use the Tailscale IP
+- Copy URL button now uses `execCommand` fallback for HTTP contexts where `navigator.clipboard` is unavailable
+- Version bumped to 1.2.0
+
 ## [1.1.0] - 2026-03-19
 
 ### Added

@@ -16,7 +16,8 @@ EnvironmentFile=/etc/phlist-server/.env
 ExecStart=/opt/phlist-server/venv/bin/gunicorn \
     --bind ${PHLIST_HOST}:${PHLIST_PORT} \
     --workers 2 \
-    --timeout 30 \
+    --timeout 300 \
+    --limit-request-line 0 \
     --access-logfile - \
     phlist_server:app
 WorkingDirectory=/opt/phlist-server

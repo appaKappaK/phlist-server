@@ -6,7 +6,9 @@ import logging
 import os
 import re
 import shutil
+import socket
 import threading
+import time
 import unicodedata
 import urllib.error
 import urllib.request
@@ -34,8 +36,8 @@ PORT:       int  = int(os.environ.get("PHLIST_PORT", "8765"))
 PIHOLE_URL: str  = os.environ.get("PHLIST_PIHOLE_URL", "")
 PIHOLE_KEY: str  = os.environ.get("PHLIST_PIHOLE_KEY", "")
 
-_MAX_BODY = 50 * 1024 * 1024  # 50 MB
-_VERSION  = "1.1.0"
+_MAX_BODY = 2 * 1024 * 1024 * 1024  # 2 GB
+_VERSION  = "1.2.0"
 
 _log = logging.getLogger("phlist-server")
 
@@ -171,6 +173,84 @@ def _trigger_gravity() -> None:
     threading.Thread(target=_fire, daemon=True).start()
 
 
+# ── System stats ─────────────────────────────────────────────────────────────
+
+def _get_system_stats() -> dict:
+    """Read system metrics from /proc and /sys — stdlib only, no psutil."""
+    stats: dict = {}
+
+    # Hostname
+    try:
+        stats["hostname"] = socket.gethostname()
+    except Exception:
+        pass
+
+    # CPU % (two /proc/stat snapshots 200ms apart)
+    try:
+        def _read_cpu():
+            line = Path("/proc/stat").open().readline()
+            vals = list(map(int, line.split()[1:]))
+            idle = vals[3] + vals[4] if len(vals) > 4 else vals[3]
+            total = sum(vals)
+            return idle, total
+
+        idle1, total1 = _read_cpu()
+        time.sleep(0.2)
+        idle2, total2 = _read_cpu()
+        d_total = total2 - total1
+        d_idle  = idle2 - idle1
+        stats["cpu_pct"] = round((1 - d_idle / d_total) * 100, 1) if d_total else 0.0
+    except Exception:
+        pass
+
+    # CPU temperature (°C)
+    for zone in range(5):
+        p = Path(f"/sys/class/thermal/thermal_zone{zone}/temp")
+        try:
+            stats["cpu_temp_c"] = round(int(p.read_text().strip()) / 1000, 1)
+            break
+        except Exception:
+            continue
+
+    # RAM (MB)
+    try:
+        mem: dict = {}
+        for line in Path("/proc/meminfo").open():
+            k, v = line.split(":", 1)
+            mem[k.strip()] = int(v.split()[0])  # kB
+        total_mb = mem["MemTotal"] // 1024
+        avail_mb = mem.get("MemAvailable", mem.get("MemFree", 0)) // 1024
+        stats["mem_total_mb"] = total_mb
+        stats["mem_used_mb"]  = total_mb - avail_mb
+        stats["mem_pct"]      = round((total_mb - avail_mb) / total_mb * 100, 1) if total_mb else 0.0
+    except Exception:
+        pass
+
+    # Disk
+    try:
+        du = shutil.disk_usage(LIST_DIR if LIST_DIR.is_dir() else Path("/"))
+        stats["disk_total_gb"] = round(du.total / 1024 ** 3, 1)
+        stats["disk_used_gb"]  = round(du.used  / 1024 ** 3, 1)
+        stats["disk_pct"]      = round(du.used / du.total * 100, 1)
+    except Exception:
+        pass
+
+    # Uptime (seconds)
+    try:
+        stats["uptime_s"] = int(float(Path("/proc/uptime").read_text().split()[0]))
+    except Exception:
+        pass
+
+    # Load average
+    try:
+        la = os.getloadavg()
+        stats["load_avg"] = [round(x, 2) for x in la]
+    except Exception:
+        pass
+
+    return stats
+
+
 # ── Blueprint + rate limiter ──────────────────────────────────────────────────
 # The limiter is created here but NOT bound to an app yet.
 # create_app() calls limiter.init_app(), which reads RATELIMIT_ENABLED from
@@ -212,6 +292,17 @@ def list_inventory() -> Response:
     )
 
 
+@bp.route("/api/stats", methods=["GET"])
+@limiter.limit("30 per minute")
+def api_stats() -> Response:
+    """System stats for the dashboard sidebar — no auth required."""
+    return Response(
+        json.dumps(_get_system_stats()),
+        status=200,
+        content_type="application/json",
+    )
+
+
 @bp.route("/health", methods=["GET"])
 @limiter.limit("10 per minute")
 def health() -> Response:
@@ -225,7 +316,7 @@ def health() -> Response:
 def put_list(slug: str) -> Response:
     """Receive and store a blocklist — requires Bearer auth.
 
-    Validates slug format, enforces 50 MB body limit, runs strict content
+    Validates slug format, enforces 2 GB body limit, runs strict content
     validation, then atomically writes the file to LIST_DIR.
     """
     _require_auth()
@@ -255,12 +346,26 @@ def put_list(slug: str) -> Response:
 
 @bp.route("/lists/<slug>.txt", methods=["GET"])
 def get_list(slug: str) -> Response:
-    """Serve a stored blocklist — no auth required (Pi-hole fetches this)."""
+    """Serve a stored blocklist — no auth required (Pi-hole fetches this).
+
+    Add ``?preview=1`` to get only the first 100 lines without loading the full file.
+    """
     if not _SLUG_RE.match(slug):
         abort(400)
     path = LIST_DIR / f"{slug}.txt"
     if not path.is_file():
         abort(404)
+    if request.args.get("preview"):
+        lines = []
+        try:
+            with path.open(encoding="utf-8", errors="replace") as fh:
+                for i, line in enumerate(fh):
+                    if i >= 100:
+                        break
+                    lines.append(line)
+        except OSError:
+            abort(500)
+        return Response("".join(lines), status=200, content_type="text/plain; charset=utf-8")
     return Response(
         path.read_text(encoding="utf-8"),
         status=200,

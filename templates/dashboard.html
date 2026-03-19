@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>phlist-server</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -25,94 +26,154 @@
     </div>
   </header>
 
-  <main class="main">
+  <div class="body-layout">
 
-    <div class="stats-row">
-      <div class="stat-card">
-        <div class="stat-value">{{ lists | length }}</div>
-        <div class="stat-label">{{ 'List' if lists | length == 1 else 'Lists' }}</div>
+    <!-- ── Sidebar ──────────────────────────────────────────────────────── -->
+    <aside class="sidebar" id="sidebar">
+
+      <div class="sidebar-section sidebar-host">
+        <div class="sidebar-hostname" id="stat-hostname">{{ host }}</div>
+        <div class="sidebar-uptime" id="stat-uptime">—</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-value" id="stat-size">—</div>
-        <div class="stat-label">Total Size</div>
-      </div>
-      {% if disk_pct is not none %}
-      <div class="stat-card">
-        <div class="stat-value">{{ disk_pct }}%</div>
-        <div class="stat-label">Disk Used</div>
-      </div>
-      {% endif %}
-    </div>
 
-    <div class="card-grid" id="card-grid">
-
-      {% for item in lists %}
-      <div class="list-card"
-           id="card-{{ item.slug }}"
-           data-slug="{{ item.slug }}"
-           data-mtime="{{ item.mtime }}"
-           data-lines="{{ item.lines }}"
-           data-size="{{ item.size }}"
-           data-url="http://{{ host }}:{{ port }}/lists/{{ item.slug }}.txt">
-
-        <div class="card-header">
-          <span class="card-slug">{{ item.slug }}</span>
-          <span class="card-lines">{{ '{:,}'.format(item.lines) }} lines</span>
-        </div>
-
-        <div class="card-meta">
-          <span class="card-size">{{ item.size }} B</span>
-          <span class="card-sep">·</span>
-          <span class="card-time" data-mtime="{{ item.mtime }}">—</span>
-        </div>
-
-        <div class="card-url-row">
-          <span class="card-url">http://{{ host }}:{{ port }}/lists/{{ item.slug }}.txt</span>
-          <button class="btn-icon btn-copy"
-                  data-url="http://{{ host }}:{{ port }}/lists/{{ item.slug }}.txt"
-                  title="Copy URL">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-            </svg>
-          </button>
-        </div>
-
-        <div class="card-actions">
-          <button class="btn btn-preview"
-                  data-slug="{{ item.slug }}"
-                  data-url="http://{{ host }}:{{ port }}/lists/{{ item.slug }}.txt">Preview</button>
-          <button class="btn btn-delete-card"
-                  data-slug="{{ item.slug }}">Delete</button>
-        </div>
-
-        <div class="card-preview hidden" id="preview-{{ item.slug }}">
-          <pre class="preview-content"></pre>
-        </div>
-
-      </div>
-      {% else %}
-      <div class="empty-state">
-        <div class="empty-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>
+      <!-- CPU arc gauge -->
+      <div class="sidebar-section">
+        <div class="gauge-wrap">
+          <svg class="gauge-svg" viewBox="0 0 100 60" aria-hidden="true">
+            <path class="gauge-track" d="M10,55 A45,45 0 0,1 90,55"/>
+            <path class="gauge-fill" id="gauge-cpu" d="M10,55 A45,45 0 0,1 90,55"
+                  stroke-dasharray="0 141.4" stroke-dashoffset="0"/>
           </svg>
+          <div class="gauge-center">
+            <span class="gauge-value" id="stat-cpu-pct">—</span>
+            <span class="gauge-unit">CPU</span>
+          </div>
         </div>
-        <div class="empty-title">No lists stored yet</div>
-        <div class="empty-hint">Push a combined list from the phlist desktop app to get started.</div>
+        <div class="stat-row">
+          <span class="stat-key">Temp</span>
+          <span class="stat-val" id="stat-cpu-temp">—</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-key">Load</span>
+          <span class="stat-val" id="stat-load">—</span>
+        </div>
       </div>
-      {% endfor %}
 
-    </div>
-  </main>
+      <!-- RAM -->
+      <div class="sidebar-section">
+        <div class="bar-label-row">
+          <span class="bar-title">RAM</span>
+          <span class="bar-pct" id="stat-mem-pct">—</span>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill bar-fill-ram" id="bar-ram" style="width:0%"></div>
+        </div>
+        <div class="bar-detail" id="stat-mem-detail">—</div>
+      </div>
 
+      <!-- Disk -->
+      <div class="sidebar-section">
+        <div class="bar-label-row">
+          <span class="bar-title">Disk</span>
+          <span class="bar-pct" id="stat-disk-pct">—</span>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill bar-fill-disk" id="bar-disk" style="width:0%"></div>
+        </div>
+        <div class="bar-detail" id="stat-disk-detail">—</div>
+      </div>
+
+      <!-- Lists summary -->
+      <div class="sidebar-section sidebar-summary">
+        <div class="summary-item">
+          <span class="summary-num" id="stat-list-count">{{ lists | length }}</span>
+          <span class="summary-lbl">{{ 'list' if lists | length == 1 else 'lists' }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-num" id="stat-total-size">—</span>
+          <span class="summary-lbl">total</span>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- ── Main content ─────────────────────────────────────────────────── -->
+    <main class="main">
+      <div class="card-grid" id="card-grid">
+
+        {% for item in lists %}
+        <div class="list-card"
+             id="card-{{ item.slug }}"
+             data-slug="{{ item.slug }}"
+             data-mtime="{{ item.mtime }}"
+             data-lines="{{ item.lines }}"
+             data-size="{{ item.size }}"
+             data-url="http://{{ host }}:{{ port }}/lists/{{ item.slug }}.txt">
+
+          <div class="card-header">
+            <span class="card-slug">{{ item.slug }}</span>
+            <span class="card-lines">{{ '{:,}'.format(item.lines) }} lines</span>
+          </div>
+
+          <div class="card-meta">
+            <span class="card-size">{{ item.size }} B</span>
+            <span class="card-sep">·</span>
+            <span class="card-time" data-mtime="{{ item.mtime }}">—</span>
+          </div>
+
+          <div class="card-url-row">
+            <span class="card-url">http://{{ host }}:{{ port }}/lists/{{ item.slug }}.txt</span>
+            <button class="btn-icon btn-copy"
+                    data-url="http://{{ host }}:{{ port }}/lists/{{ item.slug }}.txt"
+                    title="Copy URL">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+            </button>
+          </div>
+
+          <div class="card-actions">
+            <button class="btn btn-preview"
+                    data-slug="{{ item.slug }}"
+                    data-url="http://{{ host }}:{{ port }}/lists/{{ item.slug }}.txt?preview=1">Preview</button>
+            <button class="btn btn-delete-card"
+                    data-slug="{{ item.slug }}">Delete</button>
+          </div>
+
+          <div class="card-preview hidden" id="preview-{{ item.slug }}">
+            <pre class="preview-content"></pre>
+          </div>
+
+        </div>
+        {% else %}
+        <div class="empty-state">
+          <div class="empty-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>
+            </svg>
+          </div>
+          <div class="empty-title">No lists stored yet</div>
+          <div class="empty-hint">Push a combined list from the phlist desktop app to get started.</div>
+        </div>
+        {% endfor %}
+
+      </div>
+    </main>
+
+  </div><!-- /.body-layout -->
+
+  <!-- ── Delete modal ────────────────────────────────────────────────────── -->
   <div class="modal-overlay hidden" id="modal-overlay">
     <div class="modal">
       <div class="modal-title">Delete list</div>
       <p class="modal-slug" id="modal-slug-text"></p>
-      <label class="modal-label" for="modal-key-input">API key</label>
-      <input class="modal-input" id="modal-key-input" type="password"
-             placeholder="Enter API key" autocomplete="current-password">
+      <div id="modal-key-section">
+        <label class="modal-label" for="modal-key-input">API key</label>
+        <input class="modal-input" id="modal-key-input" type="text"
+               placeholder="Enter API key" autocomplete="off">
+        <button class="modal-forget hidden" id="modal-forget-key">✕ forget saved key</button>
+      </div>
       <div class="modal-actions">
         <button class="btn btn-cancel" id="modal-cancel">Cancel</button>
         <button class="btn btn-delete-confirm" id="modal-confirm">Delete</button>
@@ -122,6 +183,6 @@
 
   <div id="toast-container"></div>
 
-  <script src="/static/dashboard.js"></script>
+  <script src="/static/dashboard.js" defer></script>
 </body>
 </html>
