@@ -214,3 +214,99 @@ def test_content_reports_up_to_10_violations(client):
     assert resp.status_code == 400
     body = resp.data.decode()
     assert "further violations omitted" in body
+
+
+# ── GET / — dashboard ─────────────────────────────────────────────────────────
+
+def test_dashboard_returns_html(client):
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert b"phlist" in resp.data
+
+
+def test_dashboard_shows_list(client, tmp_path):
+    client.put("/lists/my-list.txt", headers=PUT_HEADERS, data=VALID_LIST)
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert b"my-list" in resp.data
+
+
+def test_dashboard_empty_state(client):
+    resp = client.get("/")
+    assert resp.status_code == 200
+    # Empty state message present when no lists exist
+    assert b"No lists stored yet" in resp.data
+
+
+# ── GET /lists/ — JSON inventory ──────────────────────────────────────────────
+
+def test_list_inventory_returns_json(client):
+    import json
+    resp = client.get("/lists/")
+    assert resp.status_code == 200
+    assert resp.content_type == "application/json"
+    data = json.loads(resp.data)
+    assert isinstance(data, list)
+
+
+def test_list_inventory_empty(client):
+    import json
+    resp = client.get("/lists/")
+    assert json.loads(resp.data) == []
+
+
+def test_list_inventory_contains_slug(client, tmp_path):
+    import json
+    client.put("/lists/blocklist.txt", headers=PUT_HEADERS, data=VALID_LIST)
+    resp = client.get("/lists/")
+    items = json.loads(resp.data)
+    assert any(item["slug"] == "blocklist" for item in items)
+
+
+def test_list_inventory_metadata_fields(client, tmp_path):
+    import json
+    client.put("/lists/my-list.txt", headers=PUT_HEADERS, data=VALID_LIST)
+    resp = client.get("/lists/")
+    item = json.loads(resp.data)[0]
+    assert "slug"  in item
+    assert "size"  in item
+    assert "lines" in item
+    assert "mtime" in item
+
+
+# ── DELETE /lists/<slug>.txt ──────────────────────────────────────────────────
+
+def test_delete_requires_auth(client, tmp_path):
+    (tmp_path / "my-list.txt").write_text(VALID_LIST)
+    resp = client.delete("/lists/my-list.txt")
+    assert resp.status_code == 401
+
+
+def test_delete_wrong_auth(client, tmp_path):
+    (tmp_path / "my-list.txt").write_text(VALID_LIST)
+    resp = client.delete("/lists/my-list.txt", headers=WRONG_AUTH)
+    assert resp.status_code == 403
+
+
+def test_delete_removes_file(client, tmp_path):
+    (tmp_path / "my-list.txt").write_text(VALID_LIST)
+    resp = client.delete("/lists/my-list.txt", headers=AUTH)
+    assert resp.status_code == 200
+    assert not (tmp_path / "my-list.txt").exists()
+
+
+def test_delete_then_get_returns_404(client, tmp_path):
+    (tmp_path / "my-list.txt").write_text(VALID_LIST)
+    client.delete("/lists/my-list.txt", headers=AUTH)
+    resp = client.get("/lists/my-list.txt")
+    assert resp.status_code == 404
+
+
+def test_delete_missing_returns_404(client):
+    resp = client.delete("/lists/does-not-exist.txt", headers=AUTH)
+    assert resp.status_code == 404
+
+
+def test_delete_invalid_slug_returns_400(client):
+    resp = client.delete("/lists/INVALID.txt", headers=AUTH)
+    assert resp.status_code in (400, 404)

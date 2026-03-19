@@ -4,13 +4,17 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "phlist-server"
-version = "1.0.0"
+version = "1.1.0"
 requires-python = ">=3.9"
 dependencies = [
     "flask>=3.0",
     "flask-limiter>=3.0",
     "gunicorn>=21.0",
+    "python-dotenv>=1.0",
 ]
 
 [project.scripts]
 phlist-server = "phlist_server:main"
+
+[tool.setuptools]
+py-modules = ["phlist_server"]

@@ -13,9 +13,12 @@ A lightweight Flask server that receives Pi-hole blocklists pushed from the [phl
 
 | Endpoint | Method | Auth | Purpose |
 |---|---|---|---|
+| `/` | GET | None | Web dashboard |
 | `/health` | GET | Bearer token | Connection test |
+| `/lists/` | GET | None | JSON inventory of all stored lists |
 | `/lists/{slug}.txt` | PUT | Bearer token | Receive & store a blocklist |
 | `/lists/{slug}.txt` | GET | None | Serve list to Pi-hole |
+| `/lists/{slug}.txt` | DELETE | Bearer token | Delete a stored list |
 
 ## Quick start (local / dev)
 
@@ -37,8 +40,9 @@ python phlist_server.py
 ```bash
 sudo mkdir -p /opt/phlist-server
 sudo cp phlist_server.py /opt/phlist-server/
+sudo cp -r templates static /opt/phlist-server/
 python3 -m venv /opt/phlist-server/venv
-/opt/phlist-server/venv/bin/pip install flask flask-limiter
+/opt/phlist-server/venv/bin/pip install flask flask-limiter python-dotenv
 ```
 
 ### 2. Create config
@@ -76,6 +80,8 @@ sudo systemctl status phlist-server
 | `PHLIST_LIST_DIR` | `/var/lib/phlist/lists` | Directory where blocklist `.txt` files are stored |
 | `PHLIST_HOST` | `127.0.0.1` | IP address to bind to — set to your Tailscale IP (`100.x.y.z`) |
 | `PHLIST_PORT` | `8765` | TCP port |
+| `PHLIST_PIHOLE_URL` | *(unset)* | Optional: Pi-hole base URL for auto-gravity trigger after each push (e.g. `http://pi.hole`) |
+| `PHLIST_PIHOLE_KEY` | *(unset)* | Optional: Pi-hole API key used with `PHLIST_PIHOLE_URL` |
 
 ## Network
 
@@ -104,9 +110,14 @@ pytest tests/ -v
 ## Project structure
 
 ```
-phlist_server.py        — Single-file server (~160 lines)
+phlist_server.py        — Server (~230 lines)
+templates/
+  dashboard.html        — Web dashboard template
+static/
+  style.css             — Dashboard styles
+  dashboard.js          — Dashboard interactivity
 tests/
-  test_server.py        — 27 tests (auth, CRUD, slug, content validation)
+  test_server.py        — 40 tests (auth, CRUD, slug, content validation, dashboard, delete)
 systemd/
   phlist-server.service — systemd unit for production deployment
 .env.example            — Config template

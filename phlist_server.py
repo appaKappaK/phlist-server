@@ -1,25 +1,41 @@
 """phlist-server: receive and serve Pi-hole blocklists."""
 
 import hmac
+import json
 import logging
 import os
 import re
+import shutil
+import threading
 import unicodedata
+import urllib.error
+import urllib.request
 from pathlib import Path
 
-from flask import Blueprint, Flask, Response, abort, request
+from flask import Blueprint, Flask, Response, abort, render_template, request
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+
+# ── Optional dotenv ───────────────────────────────────────────────────────────
+try:
+    from dotenv import load_dotenv
+    load_dotenv("/etc/phlist-server/.env")  # production path
+    load_dotenv()                           # local .env override
+except ImportError:
+    pass  # optional; systemd EnvironmentFile= handles production
 
 # ── Config ───────────────────────────────────────────────────────────────────
 # Read from environment (set via .env loaded by systemd EnvironmentFile=).
 # Tests override these with monkeypatch.setattr.
-API_KEY: str = os.environ.get("PHLIST_API_KEY", "")
-LIST_DIR: Path = Path(os.environ.get("PHLIST_LIST_DIR", "/var/lib/phlist/lists"))
-HOST: str = os.environ.get("PHLIST_HOST", "127.0.0.1")
-PORT: int = int(os.environ.get("PHLIST_PORT", "8765"))
+API_KEY:    str  = os.environ.get("PHLIST_API_KEY", "")
+LIST_DIR:   Path = Path(os.environ.get("PHLIST_LIST_DIR", "/var/lib/phlist/lists"))
+HOST:       str  = os.environ.get("PHLIST_HOST", "127.0.0.1")
+PORT:       int  = int(os.environ.get("PHLIST_PORT", "8765"))
+PIHOLE_URL: str  = os.environ.get("PHLIST_PIHOLE_URL", "")
+PIHOLE_KEY: str  = os.environ.get("PHLIST_PIHOLE_KEY", "")
 
-_MAX_BODY: int = 50 * 1024 * 1024  # 50 MB
+_MAX_BODY = 50 * 1024 * 1024  # 50 MB
+_VERSION  = "1.1.0"
 
 _log = logging.getLogger("phlist-server")
 
@@ -41,7 +57,7 @@ _LINE_RE = re.compile(
     re.VERBOSE,
 )
 
-_MAX_LINE_LEN = 1000
+_MAX_LINE_LEN  = 1000
 _MAX_VIOLATIONS = 10
 
 
@@ -114,6 +130,47 @@ def _require_auth() -> None:
         abort(403)
 
 
+# ── List scanner ──────────────────────────────────────────────────────────────
+
+def _scan_lists() -> list[dict]:
+    """Return metadata for all stored lists, sorted by name."""
+    if not LIST_DIR.is_dir():
+        return []
+    result = []
+    for p in sorted(LIST_DIR.glob("*.txt")):
+        stat = p.stat()
+        try:
+            lines = sum(1 for _ in p.open(encoding="utf-8", errors="replace"))
+        except OSError:
+            lines = 0
+        result.append({
+            "slug":  p.stem,
+            "size":  stat.st_size,
+            "lines": lines,
+            "mtime": stat.st_mtime,
+        })
+    return result
+
+
+# ── Gravity trigger ───────────────────────────────────────────────────────────
+
+def _trigger_gravity() -> None:
+    """Fire-and-forget Pi-hole gravity update — no-op when PHLIST_PIHOLE_URL is unset."""
+    if not PIHOLE_URL:
+        return
+
+    def _fire() -> None:
+        try:
+            url = f"{PIHOLE_URL.rstrip('/')}/admin/api.php?gravity&auth={PIHOLE_KEY}"
+            req = urllib.request.Request(url, method="GET")
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                _log.info("Gravity trigger: %s → %s", url, resp.status)
+        except Exception as exc:
+            _log.warning("Gravity trigger failed: %s", exc)
+
+    threading.Thread(target=_fire, daemon=True).start()
+
+
 # ── Blueprint + rate limiter ──────────────────────────────────────────────────
 # The limiter is created here but NOT bound to an app yet.
 # create_app() calls limiter.init_app(), which reads RATELIMIT_ENABLED from
@@ -121,6 +178,38 @@ def _require_auth() -> None:
 
 limiter = Limiter(get_remote_address, default_limits=[], storage_uri="memory://")
 bp = Blueprint("phlist", __name__)
+
+
+@bp.route("/", methods=["GET"])
+@limiter.limit("30 per minute")
+def dashboard() -> Response:
+    """Web dashboard showing all stored lists."""
+    lists = _scan_lists()
+    disk_pct = None
+    try:
+        du = shutil.disk_usage(LIST_DIR if LIST_DIR.is_dir() else Path("/"))
+        disk_pct = round(du.used / du.total * 100, 1)
+    except OSError:
+        pass
+    return render_template(
+        "dashboard.html",
+        lists=lists,
+        disk_pct=disk_pct,
+        host=HOST,
+        port=PORT,
+        version=_VERSION,
+    )
+
+
+@bp.route("/lists/", methods=["GET"])
+@limiter.limit("30 per minute")
+def list_inventory() -> Response:
+    """JSON inventory of all stored lists."""
+    return Response(
+        json.dumps(_scan_lists()),
+        status=200,
+        content_type="application/json",
+    )
 
 
 @bp.route("/health", methods=["GET"])
@@ -154,12 +243,13 @@ def put_list(slug: str) -> Response:
         return Response(err + "\n", status=400, content_type="text/plain")
 
     LIST_DIR.mkdir(parents=True, exist_ok=True)
-    tmp = LIST_DIR / f"{slug}.txt.tmp"
+    tmp  = LIST_DIR / f"{slug}.txt.tmp"
     dest = LIST_DIR / f"{slug}.txt"
     tmp.write_text(content, encoding="utf-8")
     os.replace(tmp, dest)  # atomic on POSIX — Pi-hole never sees a partial file
 
     _log.info("PUT /lists/%s.txt — %d bytes written", slug, len(content))
+    _trigger_gravity()
     return Response("ok\n", status=200, content_type="text/plain")
 
 
@@ -178,6 +268,21 @@ def get_list(slug: str) -> Response:
     )
 
 
+@bp.route("/lists/<slug>.txt", methods=["DELETE"])
+@limiter.limit("10 per minute")
+def delete_list(slug: str) -> Response:
+    """Delete a stored list — requires Bearer auth."""
+    _require_auth()
+    if not _SLUG_RE.match(slug):
+        abort(400)
+    path = LIST_DIR / f"{slug}.txt"
+    if not path.is_file():
+        abort(404)
+    path.unlink()
+    _log.info("DELETE /lists/%s.txt", slug)
+    return Response("ok\n", status=200, content_type="text/plain")
+
+
 # ── App factory ───────────────────────────────────────────────────────────────
 
 def create_app(**config) -> Flask:
@@ -186,7 +291,7 @@ def create_app(**config) -> Flask:
     Pass keyword arguments to override Flask config, e.g.:
       create_app(RATELIMIT_ENABLED=False, TESTING=True)
     """
-    _app = Flask(__name__)
+    _app = Flask(__name__, template_folder="templates", static_folder="static")
     _app.config["MAX_CONTENT_LENGTH"] = _MAX_BODY
     _app.config.update(config)
     _app.register_blueprint(bp)
@@ -209,7 +314,7 @@ def main() -> None:
         _log.error("PHLIST_API_KEY is not set — refusing to start")
         raise SystemExit(1)
     LIST_DIR.mkdir(parents=True, exist_ok=True)
-    _log.info("Starting phlist-server on %s:%s", HOST, PORT)
+    _log.info("Starting phlist-server v%s on %s:%s", _VERSION, HOST, PORT)
     _log.info("Serving lists from %s", LIST_DIR)
     app.run(host=HOST, port=PORT)
 
