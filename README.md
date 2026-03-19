@@ -15,9 +15,10 @@ A lightweight Flask server that receives Pi-hole blocklists pushed from the [phl
 |---|---|---|---|
 | `/` | GET | None | Web dashboard |
 | `/health` | GET | Bearer token | Connection test |
+| `/api/stats` | GET | None | System stats JSON (CPU, RAM, disk, uptime, temp) |
 | `/lists/` | GET | None | JSON inventory of all stored lists |
-| `/lists/{slug}.txt` | PUT | Bearer token | Receive & store a blocklist |
-| `/lists/{slug}.txt` | GET | None | Serve list to Pi-hole |
+| `/lists/{slug}.txt` | PUT | Bearer token | Receive & store a blocklist (up to 2 GB) |
+| `/lists/{slug}.txt` | GET | None | Serve list to Pi-hole (`?preview=1` for first 100 lines) |
 | `/lists/{slug}.txt` | DELETE | Bearer token | Delete a stored list |
 
 ## Quick start (local / dev)
@@ -51,7 +52,9 @@ python3 -m venv /opt/phlist-server/venv
 sudo mkdir -p /etc/phlist-server
 sudo cp .env.example /etc/phlist-server/.env
 sudo nano /etc/phlist-server/.env
-# Set PHLIST_API_KEY and PHLIST_HOST (your Tailscale IP)
+# Set PHLIST_API_KEY
+# Set PHLIST_HOST=0.0.0.0 if Pi-hole is on the LAN (not Tailscale)
+# Set PHLIST_HOST=100.x.y.z to restrict to Tailscale peers only
 sudo chmod 600 /etc/phlist-server/.env
 ```
 
@@ -78,18 +81,25 @@ sudo systemctl status phlist-server
 |---|---|---|
 | `PHLIST_API_KEY` | *(required)* | Bearer token for authentication. Generate with: `python3 -c "import secrets; print(secrets.token_hex(32))"` |
 | `PHLIST_LIST_DIR` | `/var/lib/phlist/lists` | Directory where blocklist `.txt` files are stored |
-| `PHLIST_HOST` | `127.0.0.1` | IP address to bind to — set to your Tailscale IP (`100.x.y.z`) |
+| `PHLIST_HOST` | `0.0.0.0` | IP address to bind to. Use `0.0.0.0` to listen on all interfaces (required if Pi-hole is not on Tailscale). Use your Tailscale IP (`100.x.y.z`) to restrict to Tailscale peers only. |
 | `PHLIST_PORT` | `8765` | TCP port |
 | `PHLIST_PIHOLE_URL` | *(unset)* | Optional: Pi-hole base URL for auto-gravity trigger after each push (e.g. `http://pi.hole`) |
 | `PHLIST_PIHOLE_KEY` | *(unset)* | Optional: Pi-hole API key used with `PHLIST_PIHOLE_URL` |
 
 ## Network
 
-The server is designed to bind to your **Tailscale IP** so all traffic (LAN and WAN) goes through the encrypted WireGuard tunnel.
+Two common setups:
 
-- LAN peers connect directly — no relay, negligible overhead
-- Pi-hole subscribes via MagicDNS: `http://orangepi.your-tailnet.ts.net:8765/lists/slug.txt`
-- No TLS needed at the Flask level — Tailscale handles encryption
+**All-interfaces (recommended for LAN setups):** Set `PHLIST_HOST=0.0.0.0`. Pi-hole subscribes via your server's LAN IP:
+```
+http://192.168.x.y:8765/lists/slug.txt
+```
+
+**Tailscale-only:** Set `PHLIST_HOST` to your Tailscale IP (`100.x.y.z`). Pi-hole subscribes via MagicDNS:
+```
+http://orangepi.your-tailnet.ts.net:8765/lists/slug.txt
+```
+No TLS needed at the Flask level — Tailscale handles encryption end-to-end.
 
 ## Security
 
@@ -110,12 +120,13 @@ pytest tests/ -v
 ## Project structure
 
 ```
-phlist_server.py        — Server (~230 lines)
+phlist_server.py        — Server (Flask app, routes, content validation, system stats)
 templates/
   dashboard.html        — Web dashboard template
 static/
   style.css             — Dashboard styles
   dashboard.js          — Dashboard interactivity
+  favicon.svg           — Browser tab icon
 tests/
   test_server.py        — 40 tests (auth, CRUD, slug, content validation, dashboard, delete)
 systemd/
