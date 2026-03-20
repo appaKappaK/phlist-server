@@ -296,6 +296,18 @@
 
   // ── On load ───────────────────────────────────────────────────────────────────
 
+  // Replace any server-rendered host in card URLs with the host the browser
+  // actually connected through (e.g. Tailscale IP instead of LAN IP).
+  function fixupCardUrls() {
+    var base = location.protocol + "//" + location.host;
+    document.querySelectorAll("[data-url]").forEach(function (el) {
+      el.dataset.url = el.dataset.url.replace(/^https?:\/\/[^/]+/, base);
+    });
+    document.querySelectorAll(".card-url").forEach(function (el) {
+      el.textContent = el.textContent.replace(/^https?:\/\/[^/]+/, base);
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
 
     // Initial render: timestamps + human sizes
@@ -309,6 +321,7 @@
       }
     });
 
+    fixupCardUrls();
     updateSummary();
     pollStats();
     pollLists();

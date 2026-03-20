@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.3.2] - 2026-03-20
+
+### Fixed
+- **Dashboard card URLs always match the browser's connection** — a client-side fixup now replaces any server-rendered host in card URLs with `location.host` at page load; this ensures Tailscale users see the Tailscale IP and LAN users see the LAN IP, regardless of what the server resolves
+
 ## [1.3.1] - 2026-03-20
 
 ### Fixed
