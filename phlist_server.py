@@ -36,8 +36,23 @@ PORT:       int  = int(os.environ.get("PHLIST_PORT", "8765"))
 PIHOLE_URL: str  = os.environ.get("PHLIST_PIHOLE_URL", "")
 PIHOLE_KEY: str  = os.environ.get("PHLIST_PIHOLE_KEY", "")
 
+
+def _resolve_display_host(host: str) -> str:
+    """When bound to 0.0.0.0, find the real outbound LAN IP for display."""
+    if host != "0.0.0.0":
+        return host
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+    except Exception:
+        return host
+
+
+DISPLAY_HOST = _resolve_display_host(HOST)
+
 _MAX_BODY = 2 * 1024 * 1024 * 1024  # 2 GB
-_VERSION  = "1.2.0"
+_VERSION  = "1.3.0"
 
 _log = logging.getLogger("phlist-server")
 
@@ -275,7 +290,7 @@ def dashboard() -> Response:
         "dashboard.html",
         lists=lists,
         disk_pct=disk_pct,
-        host=HOST,
+        host=DISPLAY_HOST,
         port=PORT,
         version=_VERSION,
     )

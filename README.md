@@ -92,7 +92,7 @@ Two common setups:
 
 **All-interfaces (recommended for LAN setups):** Set `PHLIST_HOST=0.0.0.0`. Pi-hole subscribes via your server's LAN IP:
 ```
-http://192.168.x.y:8765/lists/slug.txt
+http://.PUT.IP.HERE:8765/lists/slug.txt
 ```
 
 **Tailscale-only:** Set `PHLIST_HOST` to your Tailscale IP (`100.x.y.z`). Pi-hole subscribes via MagicDNS:
@@ -113,17 +113,17 @@ sudo apt update && sudo apt install caddy
 
 Create `/etc/caddy/Caddyfile`:
 ```
-your-server-ip:8766 {
+.PUT.IP.HERE:8766 {
     tls internal
     reverse_proxy localhost:8765
 }
 ```
 
-Then `sudo systemctl reload caddy`. Point the phlist client at `https://your-server-ip:8766`.
+Then `sudo systemctl reload caddy`. Point the phlist client at `https://.PUT.IP.HERE:8766`.
 
 Pi-hole gravity stays on plain HTTP — the list URLs require no authentication, so there is nothing sensitive in that traffic:
 ```
-http://your-server-ip:8765/lists/slug.txt
+http://.PUT.IP.HERE:8765/lists/slug.txt
 ```
 
 **Cert trust:** `tls internal` creates a local CA. After first run, export it and add it to your OS trust store on the machine running the phlist desktop client:
@@ -139,7 +139,7 @@ sudo cp caddy-local-ca.crt /etc/pki/ca-trust/source/anchors/ && sudo update-ca-t
 # Ubuntu/Debian
 sudo cp caddy-local-ca.crt /usr/local/share/ca-certificates/ && sudo update-ca-certificates
 ```
-After trusting the cert, update the phlist client Server URL to `https://your-server-ip:8766` and re-test the connection.
+After trusting the cert, update the phlist client Server URL to `https://.PUT.IP.HERE:8766` and re-test the connection.
 
 ## Security
 

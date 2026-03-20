@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.3.1] - 2026-03-20
+
+### Fixed
+- **Dashboard URL shows real LAN IP** — when `PHLIST_HOST=0.0.0.0`, the dashboard now resolves the actual outbound interface IP at startup (`DISPLAY_HOST`) and uses it in card URLs instead of showing `0.0.0.0`
+- **`_VERSION` bumped to match changelog** — source version string was still `1.2.0`; updated to `1.3.0` (this release)
+
+### Docs
+- Replaced bare IP examples (`192.168.x.y`, `your-server-ip`) in README with `.PUT.IP.HERE` placeholder for consistency
+
 ## [1.3.0] - 2026-03-19
 
 ### Added
