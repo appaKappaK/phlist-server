@@ -119,6 +119,10 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0;
+  position: sticky;
+  top: 3.25rem;
+  max-height: calc(100vh - 3.25rem);
+  overflow-y: auto;
 }
 
 .sidebar-section {
