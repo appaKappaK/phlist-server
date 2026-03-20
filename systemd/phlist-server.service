@@ -17,7 +17,6 @@ ExecStart=/opt/phlist-server/venv/bin/gunicorn \
     --bind ${PHLIST_HOST}:${PHLIST_PORT} \
     --workers 2 \
     --timeout 300 \
-    --limit-request-line 0 \
     --access-logfile - \
     phlist_server:app
 WorkingDirectory=/opt/phlist-server
@@ -37,6 +36,8 @@ ProtectControlGroups=yes
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 RestrictNamespaces=yes
 LockPersonality=yes
+
+UMask=0022
 
 # Only allow writing to the list storage directory.
 ReadWritePaths=/var/lib/phlist/lists

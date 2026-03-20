@@ -166,7 +166,7 @@ def _trigger_gravity() -> None:
             url = f"{PIHOLE_URL.rstrip('/')}/admin/api.php?gravity&auth={PIHOLE_KEY}"
             req = urllib.request.Request(url, method="GET")
             with urllib.request.urlopen(req, timeout=10) as resp:
-                _log.info("Gravity trigger: %s → %s", url, resp.status)
+                _log.info("Gravity trigger: %s → %s", PIHOLE_URL, resp.status)
         except Exception as exc:
             _log.warning("Gravity trigger failed: %s", exc)
 
@@ -401,6 +401,17 @@ def create_app(**config) -> Flask:
     _app.config.update(config)
     _app.register_blueprint(bp)
     limiter.init_app(_app)
+
+    @_app.after_request
+    def _security_headers(response: Response) -> Response:
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'",
+        )
+        return response
+
     return _app
 
 

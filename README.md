@@ -101,6 +101,46 @@ http://orangepi.your-tailnet.ts.net:8765/lists/slug.txt
 ```
 No TLS needed at the Flask level — Tailscale handles encryption end-to-end.
 
+**LAN with HTTPS (optional):** If you're not on Tailscale and want the phlist client → server push encrypted, put [Caddy](https://caddyserver.com) in front. Caddy generates and manages a local TLS certificate automatically.
+
+Install Caddy on the server (Debian/Ubuntu/Orange Pi):
+```bash
+sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+sudo apt update && sudo apt install caddy
+```
+
+Create `/etc/caddy/Caddyfile`:
+```
+your-server-ip:8766 {
+    tls internal
+    reverse_proxy localhost:8765
+}
+```
+
+Then `sudo systemctl reload caddy`. Point the phlist client at `https://your-server-ip:8766`.
+
+Pi-hole gravity stays on plain HTTP — the list URLs require no authentication, so there is nothing sensitive in that traffic:
+```
+http://your-server-ip:8765/lists/slug.txt
+```
+
+**Cert trust:** `tls internal` creates a local CA. After first run, export it and add it to your OS trust store on the machine running the phlist desktop client:
+```bash
+# On the server — get the CA cert
+sudo cat /var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt
+```
+Save the output as `caddy-local-ca.crt`, then on the client machine:
+```bash
+# Fedora/RHEL
+sudo cp caddy-local-ca.crt /etc/pki/ca-trust/source/anchors/ && sudo update-ca-trust
+
+# Ubuntu/Debian
+sudo cp caddy-local-ca.crt /usr/local/share/ca-certificates/ && sudo update-ca-certificates
+```
+After trusting the cert, update the phlist client Server URL to `https://your-server-ip:8766` and re-test the connection.
+
 ## Security
 
 - **Bearer token auth** with constant-time comparison (`hmac.compare_digest`) — prevents timing attacks
@@ -109,6 +149,7 @@ No TLS needed at the Flask level — Tailscale handles encryption end-to-end.
 - **Atomic writes** — lists are written to a temp file and renamed, so Pi-hole never reads a partial file
 - **Slug validation** — only `[a-z0-9-]` allowed, prevents path traversal
 - **systemd hardening** — `ProtectSystem=strict`, dedicated `phlist` user, `ReadWritePaths` locked to list directory
+- **Optional HTTPS** — for non-Tailscale LAN deployments, a Caddy reverse proxy adds TLS with a single `tls internal` directive; Pi-hole gravity continues over plain HTTP (no auth required on list URLs)
 
 ## Running tests
 
@@ -128,7 +169,7 @@ static/
   dashboard.js          — Dashboard interactivity
   favicon.svg           — Browser tab icon
 tests/
-  test_server.py        — 40 tests (auth, CRUD, slug, content validation, dashboard, delete)
+  test_server.py        — 43 tests (auth, CRUD, slug, content validation, dashboard, delete, security headers, gravity-log key-leak)
 systemd/
   phlist-server.service — systemd unit for production deployment
 .env.example            — Config template

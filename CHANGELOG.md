@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.3.0] - 2026-03-19
+
+### Added
+- **HTTP security headers** — `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, and `Content-Security-Policy` added to every response via an `after_request` hook; protects the dashboard against clickjacking and MIME-sniffing
+- **HTTPS documentation** — new "LAN with HTTPS (optional)" section in README covers Caddy reverse proxy setup with `tls internal`, cert trust instructions for Fedora and Debian/Ubuntu, and clarifies that Pi-hole gravity stays on plain HTTP
+- 3 new tests: security headers on dashboard, security headers on API endpoint, gravity log key-leak assertion (40 → 43)
+
+### Changed
+- Gravity trigger log now records `PIHOLE_URL` instead of the full auth URL — `PIHOLE_KEY` no longer appears in the systemd journal
+- Removed `--limit-request-line 0` from Gunicorn `ExecStart` — restores the default 4094-byte URL length protection (all valid phlist slugs are short)
+- `dashboard.js` `renderCard()` rewritten to use `createElement`/`textContent` for all user-supplied values (`item.slug`, constructed URL); only the static SVG icon still uses `innerHTML`
+- Added `UMask=0022` to systemd service `[Service]` section — makes the default file creation mode explicit
+- Added `chmod 600` reminder comment to `.env.example`
+- Version bumped to 1.3.0
+
 ## [1.2.0] - 2026-03-19
 
 ### Added

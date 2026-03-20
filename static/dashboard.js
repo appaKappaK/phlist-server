@@ -161,32 +161,77 @@
     div.dataset.lines = item.lines;
     div.dataset.size  = item.size;
     div.dataset.url   = url;
-    div.innerHTML =
-      '<div class="card-header">' +
-        '<span class="card-slug">' + item.slug + '</span>' +
-        '<span class="card-lines">' + item.lines.toLocaleString() + ' lines</span>' +
-      '</div>' +
-      '<div class="card-meta">' +
-        '<span class="card-size">' + formatBytes(item.size) + '</span>' +
-        '<span class="card-sep">·</span>' +
-        '<span class="card-time" data-mtime="' + item.mtime + '">' + relativeTime(item.mtime) + '</span>' +
-      '</div>' +
-      '<div class="card-url-row">' +
-        '<span class="card-url">' + url + '</span>' +
-        '<button class="btn-icon btn-copy" data-url="' + url + '" title="Copy URL">' +
-          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-            '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>' +
-            '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>' +
-          '</svg>' +
-        '</button>' +
-      '</div>' +
-      '<div class="card-actions">' +
-        '<button class="btn btn-preview" data-slug="' + item.slug + '" data-url="' + url + '?preview=1">Preview</button>' +
-        '<button class="btn btn-delete-card" data-slug="' + item.slug + '">Delete</button>' +
-      '</div>' +
-      '<div class="card-preview hidden" id="preview-' + item.slug + '">' +
-        '<pre class="preview-content"></pre>' +
-      '</div>';
+
+    var header = document.createElement("div");
+    header.className = "card-header";
+    var slugSpan = document.createElement("span");
+    slugSpan.className = "card-slug";
+    slugSpan.textContent = item.slug;
+    var linesSpan = document.createElement("span");
+    linesSpan.className = "card-lines";
+    linesSpan.textContent = item.lines.toLocaleString() + " lines";
+    header.appendChild(slugSpan);
+    header.appendChild(linesSpan);
+
+    var meta = document.createElement("div");
+    meta.className = "card-meta";
+    var sizeSpan = document.createElement("span");
+    sizeSpan.className = "card-size";
+    sizeSpan.textContent = formatBytes(item.size);
+    var sepSpan = document.createElement("span");
+    sepSpan.className = "card-sep";
+    sepSpan.textContent = "·";
+    var timeSpan = document.createElement("span");
+    timeSpan.className = "card-time";
+    timeSpan.dataset.mtime = item.mtime;
+    timeSpan.textContent = relativeTime(item.mtime);
+    meta.appendChild(sizeSpan);
+    meta.appendChild(sepSpan);
+    meta.appendChild(timeSpan);
+
+    var urlRow = document.createElement("div");
+    urlRow.className = "card-url-row";
+    var urlSpan = document.createElement("span");
+    urlSpan.className = "card-url";
+    urlSpan.textContent = url;
+    var copyBtn = document.createElement("button");
+    copyBtn.className = "btn-icon btn-copy";
+    copyBtn.dataset.url = url;
+    copyBtn.title = "Copy URL";
+    copyBtn.innerHTML =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+        '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>' +
+        '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>' +
+      '</svg>';
+    urlRow.appendChild(urlSpan);
+    urlRow.appendChild(copyBtn);
+
+    var actions = document.createElement("div");
+    actions.className = "card-actions";
+    var previewBtn = document.createElement("button");
+    previewBtn.className = "btn btn-preview";
+    previewBtn.dataset.slug = item.slug;
+    previewBtn.dataset.url = url + "?preview=1";
+    previewBtn.textContent = "Preview";
+    var deleteBtn = document.createElement("button");
+    deleteBtn.className = "btn btn-delete-card";
+    deleteBtn.dataset.slug = item.slug;
+    deleteBtn.textContent = "Delete";
+    actions.appendChild(previewBtn);
+    actions.appendChild(deleteBtn);
+
+    var preview = document.createElement("div");
+    preview.className = "card-preview hidden";
+    preview.id = "preview-" + item.slug;
+    var pre = document.createElement("pre");
+    pre.className = "preview-content";
+    preview.appendChild(pre);
+
+    div.appendChild(header);
+    div.appendChild(meta);
+    div.appendChild(urlRow);
+    div.appendChild(actions);
+    div.appendChild(preview);
     return div;
   }
 

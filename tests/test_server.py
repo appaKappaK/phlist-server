@@ -1,5 +1,7 @@
 """Tests for phlist-server."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
 import phlist_server
 
@@ -310,3 +312,44 @@ def test_delete_missing_returns_404(client):
 def test_delete_invalid_slug_returns_400(client):
     resp = client.delete("/lists/INVALID.txt", headers=AUTH)
     assert resp.status_code in (400, 404)
+
+
+# ── Security headers ──────────────────────────────────────────────────────────
+
+def test_security_headers_on_dashboard(client):
+    resp = client.get("/")
+    assert resp.headers.get("X-Frame-Options") == "DENY"
+    assert resp.headers.get("X-Content-Type-Options") == "nosniff"
+    assert "Content-Security-Policy" in resp.headers
+
+
+def test_security_headers_on_api(client):
+    resp = client.get("/lists/")
+    assert resp.headers.get("X-Frame-Options") == "DENY"
+    assert resp.headers.get("X-Content-Type-Options") == "nosniff"
+
+
+def test_gravity_log_does_not_contain_key(monkeypatch, caplog, tmp_path):
+    """Gravity trigger must log PIHOLE_URL but not PIHOLE_KEY."""
+    import logging
+    import phlist_server
+
+    monkeypatch.setattr(phlist_server, "API_KEY", TEST_KEY)
+    monkeypatch.setattr(phlist_server, "LIST_DIR", tmp_path)
+    monkeypatch.setattr(phlist_server, "PIHOLE_URL", "http://pi.hole")
+    monkeypatch.setattr(phlist_server, "PIHOLE_KEY", "super-secret-pihole-key")
+
+    with caplog.at_level(logging.INFO):
+        # _fire() runs in a thread and makes a real HTTP call which will fail,
+        # so patch urlopen to avoid network access
+        mock_resp = MagicMock()
+        mock_resp.status = 200
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        with patch("urllib.request.urlopen", return_value=mock_resp):
+            phlist_server._trigger_gravity()
+            import time; time.sleep(0.1)  # let the daemon thread finish
+
+    log_text = " ".join(r.message for r in caplog.records)
+    assert "super-secret-pihole-key" not in log_text
+    assert "pi.hole" in log_text
