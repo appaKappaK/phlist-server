@@ -103,9 +103,8 @@ body {
 .body-layout {
   display: flex;
   align-items: flex-start;
-  max-width: 1200px;
-  margin: 0 auto;
   min-height: calc(100vh - 3.25rem);
+  padding-left: var(--sidebar-w);
 }
 
 /* ── Sidebar ─────────────────────────────────────────────────────────────── */
@@ -114,15 +113,16 @@ body {
   flex-shrink: 0;
   background: var(--surface);
   border-right: 1px solid var(--border);
-  min-height: calc(100vh - 3.25rem);
   padding: 1rem .9rem;
   display: flex;
   flex-direction: column;
   gap: 0;
-  position: sticky;
+  position: fixed;
+  left: 0;
   top: 3.25rem;
-  max-height: calc(100vh - 3.25rem);
+  height: calc(100vh - 3.25rem);
   overflow-y: auto;
+  z-index: 40;
 }
 
 .sidebar-section {
