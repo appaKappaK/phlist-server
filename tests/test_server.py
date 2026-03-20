@@ -353,3 +353,41 @@ def test_gravity_log_does_not_contain_key(monkeypatch, caplog, tmp_path):
     log_text = " ".join(r.message for r in caplog.records)
     assert "super-secret-pihole-key" not in log_text
     assert "pi.hole" in log_text
+
+
+# ── GET /api/stats ────────────────────────────────────────────────────────────
+
+def test_stats_returns_json(client):
+    resp = client.get("/api/stats")
+    assert resp.status_code == 200
+    assert resp.content_type == "application/json"
+
+
+def test_stats_has_expected_fields(client):
+    import json
+    resp = client.get("/api/stats")
+    data = json.loads(resp.data)
+    # These keys are always present on any Linux host
+    for key in ("hostname", "uptime_s", "load_avg", "mem_total_mb", "disk_total_gb"):
+        assert key in data, f"missing key: {key}"
+
+
+# ── GET /lists/<slug>.txt?preview=1 ──────────────────────────────────────────
+
+def test_preview_returns_200(client, tmp_path):
+    (tmp_path / "t.txt").write_text("ads.example.com\n" * 10)
+    resp = client.get("/lists/t.txt?preview=1")
+    assert resp.status_code == 200
+
+
+def test_preview_truncates_to_100_lines(client, tmp_path):
+    (tmp_path / "t.txt").write_text("ads.example.com\n" * 150)
+    resp = client.get("/lists/t.txt?preview=1")
+    assert resp.data.decode().count("\n") == 100
+
+
+def test_preview_full_file_when_under_100_lines(client, tmp_path):
+    content = "ads.example.com\n" * 50
+    (tmp_path / "t.txt").write_text(content)
+    resp = client.get("/lists/t.txt?preview=1")
+    assert resp.data.decode() == content
