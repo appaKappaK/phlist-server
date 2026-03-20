@@ -144,11 +144,14 @@ After trusting the cert, update the phlist client Server URL to `https://your-se
 ## Security
 
 - **Bearer token auth** with constant-time comparison (`hmac.compare_digest`) — prevents timing attacks
+- **HTTP security headers** — `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, and `Content-Security-Policy` on every response; protects the dashboard against clickjacking and MIME-sniffing
 - **Strict content validation** — every uploaded line must be ASCII-only and match a known blocklist format; non-ASCII characters (Unicode homoglyphs, zero-width chars, bidi overrides) are rejected with a detailed error showing which line failed
 - **Rate limiting** — 10 req/min on health check, 5 req/min on PUT uploads
 - **Atomic writes** — lists are written to a temp file and renamed, so Pi-hole never reads a partial file
 - **Slug validation** — only `[a-z0-9-]` allowed, prevents path traversal
-- **systemd hardening** — `ProtectSystem=strict`, dedicated `phlist` user, `ReadWritePaths` locked to list directory
+- **Safe dashboard rendering** — list slugs and URLs are inserted via `textContent` (not `innerHTML`), preventing XSS if slug validation were ever loosened
+- **No key in logs** — gravity trigger logs the Pi-hole base URL only; `PIHOLE_KEY` never appears in the systemd journal
+- **systemd hardening** — `ProtectSystem=strict`, `UMask=0022`, dedicated `phlist` user, `ReadWritePaths` locked to list directory
 - **Optional HTTPS** — for non-Tailscale LAN deployments, a Caddy reverse proxy adds TLS with a single `tls internal` directive; Pi-hole gravity continues over plain HTTP (no auth required on list URLs)
 
 ## Running tests
