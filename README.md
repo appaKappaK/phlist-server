@@ -172,7 +172,7 @@ static/
   dashboard.js          — Dashboard interactivity
   favicon.svg           — Browser tab icon
 tests/
-  test_server.py        — 43 tests (auth, CRUD, slug, content validation, dashboard, delete, security headers, gravity-log key-leak)
+  test_server.py        — 48 tests (auth, CRUD, slug, content validation, dashboard, delete, security headers, gravity-log key-leak, stats, preview)
 systemd/
   phlist-server.service — systemd unit for production deployment
 .env.example            — Config template
