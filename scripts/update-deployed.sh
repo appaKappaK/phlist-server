@@ -94,9 +94,18 @@ if [[ "${host}" == "0.0.0.0" || "${host}" == "::" ]]; then
     host="127.0.0.1"
 fi
 
-curl -fsS \
-    -H "Authorization: Bearer ${api_key}" \
-    "http://${host}:${port}/health" >/dev/null
+health_url="http://${host}:${port}/health"
+for attempt in {1..10}; do
+    if curl -fsS -H "Authorization: Bearer ${api_key}" "${health_url}" >/dev/null; then
+        break
+    fi
+
+    if [[ "${attempt}" -eq 10 ]]; then
+        die "health check failed after ${attempt} attempts: ${health_url}"
+    fi
+
+    sleep 1
+done
 
 info "Update complete"
 echo "Backup: ${backup_dir}"
