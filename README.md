@@ -106,9 +106,9 @@ Choose the narrowest bind address that still lets Pi-hole reach the server:
 
 **Local-only:** Keep `PHLIST_HOST=127.0.0.1`. Only software running on the same machine can connect. This is the safest default, but a Pi-hole on another device cannot subscribe to it directly.
 
-**Tailscale-only:** Set `PHLIST_HOST` to your Tailscale IP (`100.x.y.z`). Pi-hole subscribes via MagicDNS:
+**Tailscale-only:** Set `PHLIST_HOST` to your Tailscale IP (`100.x.y.z`). Pi-hole subscribes via that same Tailscale IP:
 ```
-http://orangepi.your-tailnet.ts.net:8765/lists/slug.txt
+http://100.x.y.z:8765/lists/slug.txt
 ```
 No TLS needed at the Flask level — Tailscale handles encryption end-to-end.
 
@@ -117,46 +117,6 @@ No TLS needed at the Flask level — Tailscale handles encryption end-to-end.
 http://.PUT.IP.HERE:8765/lists/slug.txt
 ```
 If you use `0.0.0.0`, protect the host with your firewall and do not expose port `8765` to the internet.
-
-**LAN with HTTPS (optional):** If you're not on Tailscale and want the phlist client → server push encrypted, put [Caddy](https://caddyserver.com) in front. Caddy generates and manages a local TLS certificate automatically.
-
-Install Caddy on the server (Debian/Ubuntu/Orange Pi):
-```bash
-sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
-sudo apt update && sudo apt install caddy
-```
-
-Create `/etc/caddy/Caddyfile`:
-```
-.PUT.IP.HERE:8766 {
-    tls internal
-    reverse_proxy localhost:8765
-}
-```
-
-Then `sudo systemctl reload caddy`. Point the phlist client at `https://.PUT.IP.HERE:8766`.
-
-Pi-hole gravity stays on plain HTTP — the list URLs require no authentication, so there is nothing sensitive in that traffic:
-```
-http://.PUT.IP.HERE:8765/lists/slug.txt
-```
-
-**Cert trust:** `tls internal` creates a local CA. After first run, export it and add it to your OS trust store on the machine running the phlist desktop client:
-```bash
-# On the server — get the CA cert
-sudo cat /var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt
-```
-Save the output as `caddy-local-ca.crt`, then on the client machine:
-```bash
-# Fedora/RHEL
-sudo cp caddy-local-ca.crt /etc/pki/ca-trust/source/anchors/ && sudo update-ca-trust
-
-# Ubuntu/Debian
-sudo cp caddy-local-ca.crt /usr/local/share/ca-certificates/ && sudo update-ca-certificates
-```
-After trusting the cert, update the phlist client Server URL to `https://.PUT.IP.HERE:8766` and re-test the connection.
 
 ## Security
 
@@ -169,7 +129,6 @@ After trusting the cert, update the phlist client Server URL to `https://.PUT.IP
 - **Safe dashboard rendering** — list slugs and URLs are inserted via `textContent` (not `innerHTML`), preventing XSS if slug validation were ever loosened
 - **No key in logs** — gravity trigger logs the Pi-hole base URL only; `PIHOLE_KEY` never appears in the systemd journal
 - **systemd hardening** — `ProtectSystem=strict`, `UMask=0022`, dedicated `phlist` user, `ReadWritePaths` locked to list directory
-- **Optional HTTPS** — for non-Tailscale LAN deployments, a Caddy reverse proxy adds TLS with a single `tls internal` directive; Pi-hole gravity continues over plain HTTP (no auth required on list URLs)
 
 ## Running tests
 
