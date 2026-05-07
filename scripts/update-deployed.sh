@@ -95,12 +95,14 @@ if [[ "${host}" == "0.0.0.0" || "${host}" == "::" ]]; then
 fi
 
 health_url="http://${host}:${port}/health"
+info "Waiting for ${health_url}"
 for attempt in {1..10}; do
-    if curl -fsS -H "Authorization: Bearer ${api_key}" "${health_url}" >/dev/null; then
+    if curl -fss -H "Authorization: Bearer ${api_key}" "${health_url}" >/dev/null; then
         break
     fi
 
     if [[ "${attempt}" -eq 10 ]]; then
+        curl -fsS -H "Authorization: Bearer ${api_key}" "${health_url}" >/dev/null || true
         die "health check failed after ${attempt} attempts: ${health_url}"
     fi
 
