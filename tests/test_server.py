@@ -24,6 +24,28 @@ tracker.evil.com
 """
 
 
+def test_env_int_default(monkeypatch):
+    monkeypatch.delenv("PHLIST_MAX_UPLOAD_MB", raising=False)
+    assert phlist_server._env_int("PHLIST_MAX_UPLOAD_MB", 2048) == 2048
+
+
+def test_env_int_custom(monkeypatch):
+    monkeypatch.setenv("PHLIST_MAX_UPLOAD_MB", "512")
+    assert phlist_server._env_int("PHLIST_MAX_UPLOAD_MB", 2048) == 512
+
+
+def test_env_int_rejects_invalid(monkeypatch):
+    monkeypatch.setenv("PHLIST_MAX_UPLOAD_MB", "nope")
+    with pytest.raises(RuntimeError, match="PHLIST_MAX_UPLOAD_MB must be an integer"):
+        phlist_server._env_int("PHLIST_MAX_UPLOAD_MB", 2048)
+
+
+def test_env_int_rejects_too_small(monkeypatch):
+    monkeypatch.setenv("PHLIST_MAX_UPLOAD_MB", "0")
+    with pytest.raises(RuntimeError, match="PHLIST_MAX_UPLOAD_MB must be at least 1"):
+        phlist_server._env_int("PHLIST_MAX_UPLOAD_MB", 2048)
+
+
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(phlist_server, "API_KEY", TEST_KEY)
@@ -78,6 +100,24 @@ def test_put_content_matches(client, tmp_path):
     resp = client.put("/lists/blocklist.txt", headers=PUT_HEADERS, data=VALID_LIST)
     assert resp.status_code == 200
     assert (tmp_path / "blocklist.txt").read_text() == VALID_LIST
+
+
+def test_put_rejects_body_over_configured_upload_cap(tmp_path, monkeypatch):
+    monkeypatch.setattr(phlist_server, "API_KEY", TEST_KEY)
+    monkeypatch.setattr(phlist_server, "DELETE_PWD", "")
+    monkeypatch.setattr(phlist_server, "LIST_DIR", tmp_path)
+    monkeypatch.setattr(phlist_server, "_MAX_BODY", 8)
+
+    test_app = phlist_server.create_app(RATELIMIT_ENABLED=False, TESTING=True)
+    with test_app.test_client() as c:
+        resp = c.put(
+            "/lists/my-list.txt",
+            headers=PUT_HEADERS,
+            data="ads.example.com\n",
+        )
+
+    assert resp.status_code == 413
+    assert not (tmp_path / "my-list.txt").exists()
 
 
 def test_put_overwrites_existing(client, tmp_path):

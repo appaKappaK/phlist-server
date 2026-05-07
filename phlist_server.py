@@ -38,6 +38,20 @@ PIHOLE_URL: str  = os.environ.get("PHLIST_PIHOLE_URL", "")
 PIHOLE_KEY: str  = os.environ.get("PHLIST_PIHOLE_KEY", "")
 
 
+def _env_int(name: str, default: int, minimum: int = 1) -> int:
+    """Read a positive integer environment variable."""
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise RuntimeError(f"{name} must be an integer") from exc
+    if value < minimum:
+        raise RuntimeError(f"{name} must be at least {minimum}")
+    return value
+
+
 def _resolve_display_host(host: str) -> str:
     """When bound to 0.0.0.0, find the real outbound LAN IP for display."""
     if host != "0.0.0.0":
@@ -52,7 +66,8 @@ def _resolve_display_host(host: str) -> str:
 
 DISPLAY_HOST = _resolve_display_host(HOST)
 
-_MAX_BODY = 2 * 1024 * 1024 * 1024  # 2 GB
+MAX_UPLOAD_MB = _env_int("PHLIST_MAX_UPLOAD_MB", 2048)
+_MAX_BODY = MAX_UPLOAD_MB * 1024 * 1024
 _VERSION  = "1.3.0"
 
 _log = logging.getLogger("phlist-server")
