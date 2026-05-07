@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 ### Changed
 - Dashboard delete modal now asks for a delete password and stores it separately in session storage
 - Deployment updater waits briefly for Gunicorn to accept connections before failing the post-restart health check
+- `.env.example` and README now document `127.0.0.1` as the safer default bind address and call out that `0.0.0.0` exposes the service on every interface
 
 ## [1.3.2] - 2026-03-20
 

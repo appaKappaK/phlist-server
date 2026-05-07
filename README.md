@@ -54,8 +54,9 @@ sudo cp .env.example /etc/phlist-server/.env
 sudo nano /etc/phlist-server/.env
 # Set PHLIST_API_KEY
 # Set PHLIST_DELETE_PWD for dashboard deletes
-# Set PHLIST_HOST=0.0.0.0 if Pi-hole is on the LAN (not Tailscale)
+# Keep PHLIST_HOST=127.0.0.1 for local-only access
 # Set PHLIST_HOST=100.x.y.z to restrict to Tailscale peers only
+# Set PHLIST_HOST=0.0.0.0 only if Pi-hole must reach this server over your LAN
 sudo chmod 600 /etc/phlist-server/.env
 ```
 
@@ -94,25 +95,28 @@ The updater replaces only the deployed app files in `/opt/phlist-server`, refres
 | `PHLIST_API_KEY` | *(required)* | Bearer token for authentication. Generate with: `python3 -c "import secrets; print(secrets.token_hex(32))"` |
 | `PHLIST_DELETE_PWD` | falls back to `PHLIST_API_KEY` | Password required by the web dashboard delete modal and DELETE endpoint |
 | `PHLIST_LIST_DIR` | `/var/lib/phlist/lists` | Directory where blocklist `.txt` files are stored |
-| `PHLIST_HOST` | `0.0.0.0` | IP address to bind to. Use `0.0.0.0` to listen on all interfaces (required if Pi-hole is not on Tailscale). Use your Tailscale IP (`100.x.y.z`) to restrict to Tailscale peers only. |
+| `PHLIST_HOST` | `127.0.0.1` | IP address to bind to. `127.0.0.1` is local-only. Use your Tailscale IP (`100.x.y.z`) to restrict access to Tailscale peers. Use `0.0.0.0` only when another LAN device, such as Pi-hole, must connect directly; it listens on every network interface. |
 | `PHLIST_PORT` | `8765` | TCP port |
 | `PHLIST_PIHOLE_URL` | *(unset)* | Optional: Pi-hole base URL for auto-gravity trigger after each push (e.g. `http://pi.hole`) |
 | `PHLIST_PIHOLE_KEY` | *(unset)* | Optional: Pi-hole API key used with `PHLIST_PIHOLE_URL` |
 
 ## Network
 
-Two common setups:
+Choose the narrowest bind address that still lets Pi-hole reach the server:
 
-**All-interfaces (recommended for LAN setups):** Set `PHLIST_HOST=0.0.0.0`. Pi-hole subscribes via your server's LAN IP:
-```
-http://.PUT.IP.HERE:8765/lists/slug.txt
-```
+**Local-only:** Keep `PHLIST_HOST=127.0.0.1`. Only software running on the same machine can connect. This is the safest default, but a Pi-hole on another device cannot subscribe to it directly.
 
 **Tailscale-only:** Set `PHLIST_HOST` to your Tailscale IP (`100.x.y.z`). Pi-hole subscribes via MagicDNS:
 ```
 http://orangepi.your-tailnet.ts.net:8765/lists/slug.txt
 ```
 No TLS needed at the Flask level — Tailscale handles encryption end-to-end.
+
+**LAN / all-interfaces:** Set `PHLIST_HOST=0.0.0.0` only when Pi-hole is on another LAN device and cannot reach this server through Tailscale. `0.0.0.0` is not a private LAN address; it means "listen on every network interface", including Wi-Fi, Ethernet, VPN, and any other active interface. Pi-hole subscribes via your server's LAN IP:
+```
+http://.PUT.IP.HERE:8765/lists/slug.txt
+```
+If you use `0.0.0.0`, protect the host with your firewall and do not expose port `8765` to the internet.
 
 **LAN with HTTPS (optional):** If you're not on Tailscale and want the phlist client → server push encrypted, put [Caddy](https://caddyserver.com) in front. Caddy generates and manages a local TLS certificate automatically.
 
