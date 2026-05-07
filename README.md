@@ -13,13 +13,15 @@ A lightweight Flask server that receives Pi-hole blocklists pushed from the [phl
 
 | Endpoint | Method | Auth | Purpose |
 |---|---|---|---|
-| `/` | GET | None | Web dashboard |
-| `/health` | GET | Bearer token | Connection test |
-| `/api/stats` | GET | None | System stats JSON (CPU, RAM, disk, uptime, temp) |
-| `/lists/` | GET | None | JSON inventory of all stored lists |
-| `/lists/{slug}.txt` | PUT | Bearer token | Receive & store a blocklist (up to 2 GB) |
-| `/lists/{slug}.txt` | GET | None | Serve list to Pi-hole (`?preview=1` for first 100 lines) |
-| `/lists/{slug}.txt` | DELETE | Delete password bearer token | Delete a stored list |
+| `/` | GET | None | Web dashboard; rate limited to 30 req/min |
+| `/health` | GET | Bearer token | Authenticated connection test; rate limited to 10 req/min |
+| `/api/stats` | GET | None | Dashboard system stats JSON (CPU, RAM, disk, uptime, temp); rate limited to 30 req/min |
+| `/lists/` | GET | None | JSON inventory of stored lists with slug, size, line count, and mtime; rate limited to 30 req/min |
+| `/lists/{slug}.txt` | PUT | Bearer token | Receive, validate, and atomically store a blocklist pushed by phlist; max request body is 2 GB and rate limit is 5 req/min |
+| `/lists/{slug}.txt` | GET | None | Serve full list to Pi-hole, or the first 100 lines with `?preview=1` |
+| `/lists/{slug}.txt` | DELETE | Delete password bearer token | Delete a stored list; rate limited to 10 req/min |
+
+In the phlist desktop app, source fetch timeout, per-source max size, and push timeout are client-side settings. This server still enforces its own 2 GB upload cap, fixed 100-line preview mode, 300-second Gunicorn worker timeout in the deployed systemd service, and 10-second optional Pi-hole gravity trigger timeout.
 
 ## Quick start (local / dev)
 
