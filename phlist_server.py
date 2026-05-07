@@ -30,6 +30,7 @@ except ImportError:
 # Read from environment (set via .env loaded by systemd EnvironmentFile=).
 # Tests override these with monkeypatch.setattr.
 API_KEY:    str  = os.environ.get("PHLIST_API_KEY", "")
+DELETE_PWD: str  = os.environ.get("PHLIST_DELETE_PWD", "")
 LIST_DIR:   Path = Path(os.environ.get("PHLIST_LIST_DIR", "/var/lib/phlist/lists"))
 HOST:       str  = os.environ.get("PHLIST_HOST", "127.0.0.1")
 PORT:       int  = int(os.environ.get("PHLIST_PORT", "8765"))
@@ -144,6 +145,24 @@ def _require_auth() -> None:
         abort(401)
     token = header[7:]
     if not hmac.compare_digest(token.encode("utf-8"), API_KEY.encode("utf-8")):
+        abort(403)
+
+
+def _require_delete_auth() -> None:
+    """Abort 401/403 if the request lacks the delete password.
+
+    ``PHLIST_DELETE_PWD`` is preferred for dashboard deletes. If it is unset,
+    fall back to ``PHLIST_API_KEY`` for compatibility with existing installs.
+    """
+    expected = DELETE_PWD or API_KEY
+    if not expected:
+        _log.error("No delete credential is configured — rejecting request")
+        abort(500, "Server has no delete credential configured")
+    header = request.headers.get("Authorization", "")
+    if not header.startswith("Bearer "):
+        abort(401)
+    token = header[7:]
+    if not hmac.compare_digest(token.encode("utf-8"), expected.encode("utf-8")):
         abort(403)
 
 
@@ -391,8 +410,8 @@ def get_list(slug: str) -> Response:
 @bp.route("/lists/<slug>.txt", methods=["DELETE"])
 @limiter.limit("10 per minute")
 def delete_list(slug: str) -> Response:
-    """Delete a stored list — requires Bearer auth."""
-    _require_auth()
+    """Delete a stored list — requires delete password Bearer auth."""
+    _require_delete_auth()
     if not _SLUG_RE.match(slug):
         abort(400)
     path = LIST_DIR / f"{slug}.txt"

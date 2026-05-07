@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## Unreleased
+
+### Added
+- **Separate dashboard delete password** — `DELETE /lists/{slug}.txt` now uses `PHLIST_DELETE_PWD` when configured, with fallback to `PHLIST_API_KEY` for existing installs
+
+### Changed
+- Dashboard delete modal now asks for a delete password and stores it separately in session storage
+
 ## [1.3.2] - 2026-03-20
 
 ### Fixed

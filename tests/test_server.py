@@ -7,7 +7,9 @@ import phlist_server
 
 
 TEST_KEY = "test-secret-key"
+TEST_DELETE_PWD = "test-delete-password"
 AUTH = {"Authorization": f"Bearer {TEST_KEY}"}
+DELETE_AUTH = {"Authorization": f"Bearer {TEST_DELETE_PWD}"}
 WRONG_AUTH = {"Authorization": "Bearer wrong-key"}
 PUT_HEADERS = {**AUTH, "Content-Type": "text/plain; charset=utf-8"}
 
@@ -25,6 +27,7 @@ tracker.evil.com
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(phlist_server, "API_KEY", TEST_KEY)
+    monkeypatch.setattr(phlist_server, "DELETE_PWD", "")
     monkeypatch.setattr(phlist_server, "LIST_DIR", tmp_path)
     # create_app passes RATELIMIT_ENABLED=False so rate limits don't
     # accumulate across tests (limiter reads config at init time).
@@ -288,6 +291,26 @@ def test_delete_wrong_auth(client, tmp_path):
     (tmp_path / "my-list.txt").write_text(VALID_LIST)
     resp = client.delete("/lists/my-list.txt", headers=WRONG_AUTH)
     assert resp.status_code == 403
+
+
+def test_delete_uses_delete_password_when_configured(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(phlist_server, "DELETE_PWD", TEST_DELETE_PWD)
+    (tmp_path / "my-list.txt").write_text(VALID_LIST)
+
+    resp = client.delete("/lists/my-list.txt", headers=DELETE_AUTH)
+
+    assert resp.status_code == 200
+    assert not (tmp_path / "my-list.txt").exists()
+
+
+def test_delete_rejects_api_key_when_delete_password_configured(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(phlist_server, "DELETE_PWD", TEST_DELETE_PWD)
+    (tmp_path / "my-list.txt").write_text(VALID_LIST)
+
+    resp = client.delete("/lists/my-list.txt", headers=AUTH)
+
+    assert resp.status_code == 403
+    assert (tmp_path / "my-list.txt").exists()
 
 
 def test_delete_removes_file(client, tmp_path):

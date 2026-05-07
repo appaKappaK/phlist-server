@@ -19,7 +19,7 @@ A lightweight Flask server that receives Pi-hole blocklists pushed from the [phl
 | `/lists/` | GET | None | JSON inventory of all stored lists |
 | `/lists/{slug}.txt` | PUT | Bearer token | Receive & store a blocklist (up to 2 GB) |
 | `/lists/{slug}.txt` | GET | None | Serve list to Pi-hole (`?preview=1` for first 100 lines) |
-| `/lists/{slug}.txt` | DELETE | Bearer token | Delete a stored list |
+| `/lists/{slug}.txt` | DELETE | Delete password bearer token | Delete a stored list |
 
 ## Quick start (local / dev)
 
@@ -29,7 +29,7 @@ cd phlist-server
 pip install -r requirements.txt
 
 cp .env.example .env
-# Edit .env — set PHLIST_API_KEY and PHLIST_HOST
+# Edit .env — set PHLIST_API_KEY, PHLIST_DELETE_PWD, and PHLIST_HOST
 
 python phlist_server.py
 ```
@@ -53,6 +53,7 @@ sudo mkdir -p /etc/phlist-server
 sudo cp .env.example /etc/phlist-server/.env
 sudo nano /etc/phlist-server/.env
 # Set PHLIST_API_KEY
+# Set PHLIST_DELETE_PWD for dashboard deletes
 # Set PHLIST_HOST=0.0.0.0 if Pi-hole is on the LAN (not Tailscale)
 # Set PHLIST_HOST=100.x.y.z to restrict to Tailscale peers only
 sudo chmod 600 /etc/phlist-server/.env
@@ -80,6 +81,7 @@ sudo systemctl status phlist-server
 | Variable | Default | Description |
 |---|---|---|
 | `PHLIST_API_KEY` | *(required)* | Bearer token for authentication. Generate with: `python3 -c "import secrets; print(secrets.token_hex(32))"` |
+| `PHLIST_DELETE_PWD` | falls back to `PHLIST_API_KEY` | Password required by the web dashboard delete modal and DELETE endpoint |
 | `PHLIST_LIST_DIR` | `/var/lib/phlist/lists` | Directory where blocklist `.txt` files are stored |
 | `PHLIST_HOST` | `0.0.0.0` | IP address to bind to. Use `0.0.0.0` to listen on all interfaces (required if Pi-hole is not on Tailscale). Use your Tailscale IP (`100.x.y.z`) to restrict to Tailscale peers only. |
 | `PHLIST_PORT` | `8765` | TCP port |

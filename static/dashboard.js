@@ -382,11 +382,11 @@
 
       if (deleteBtn) {
         var dSlug    = deleteBtn.dataset.slug;
-        var savedKey = sessionStorage.getItem("phlist_api_key");
-        if (savedKey) {
-          // Key already cached — skip modal, confirm with native dialog
+        var savedPwd = sessionStorage.getItem("phlist_delete_pwd");
+        if (savedPwd) {
+          // Password already cached — skip modal, confirm with native dialog
           if (!confirm('Delete "' + dSlug + '.txt"?')) return;
-          doDelete(dSlug, savedKey);
+          doDelete(dSlug, savedPwd);
         } else {
           openModal(dSlug);
         }
@@ -410,8 +410,8 @@
             toast('Deleted "' + slug + '.txt"', "success");
             closeModal();
           } else if (r.status === 403) {
-            sessionStorage.removeItem("phlist_api_key");
-            toast("Wrong API key — enter it again", "error");
+            sessionStorage.removeItem("phlist_delete_pwd");
+            toast("Wrong delete password — enter it again", "error");
             openModal(slug);
           } else {
             toast("Delete failed (" + r.status + ")", "error");
@@ -463,9 +463,9 @@
 
     if (forgetBtn) {
       forgetBtn.addEventListener("click", function () {
-        sessionStorage.removeItem("phlist_api_key");
+        sessionStorage.removeItem("phlist_delete_pwd");
         forgetBtn.classList.add("hidden");
-        toast("Saved key cleared", "info");
+        toast("Saved password cleared", "info");
       });
     }
 
@@ -477,7 +477,7 @@
         return;
       }
       keyInput.classList.remove("input-error");
-      sessionStorage.setItem("phlist_api_key", key);
+      sessionStorage.setItem("phlist_delete_pwd", key);
       if (forgetBtn) forgetBtn.classList.remove("hidden");
 
       confirmBtn.disabled    = true;
