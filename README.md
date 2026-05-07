@@ -76,6 +76,17 @@ sudo systemctl enable --now phlist-server
 sudo systemctl status phlist-server
 ```
 
+### Updating an existing deployment
+
+From a fresh checkout on the server:
+
+```bash
+git pull
+sudo scripts/update-deployed.sh
+```
+
+The updater replaces only the deployed app files in `/opt/phlist-server`, refreshes the virtualenv dependencies, reinstalls the systemd unit, restarts `phlist-server`, and runs an authenticated `/health` check. It does not overwrite `/etc/phlist-server/.env` or `/var/lib/phlist/lists`.
+
 ## Configuration
 
 | Variable | Default | Description |
@@ -177,5 +188,7 @@ tests/
   test_server.py        — 48 tests (auth, CRUD, slug, content validation, dashboard, delete, security headers, gravity-log key-leak, stats, preview)
 systemd/
   phlist-server.service — systemd unit for production deployment
+scripts/
+  update-deployed.sh    — Update an existing /opt/phlist-server systemd deployment
 .env.example            — Config template
 ```
